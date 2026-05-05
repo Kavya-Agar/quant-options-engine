@@ -44,24 +44,27 @@ quant-options-engine/
 
 ## Quickstart
 
-**Backend**
+**Install everything**
 
 ```bash
-pip install -r requirements.txt
-
-# Run the API
-uvicorn api.main:app --reload --port 8000
-# → Docs at http://localhost:8000/docs
+make install   # pip install -r requirements.txt && cd dashboard && npm install
 ```
 
-**Frontend**
+**Run backend + frontend together**
 
 ```bash
-cd dashboard
-npm install
-npm run dev
-# → http://localhost:5173
+make dev   # starts FastAPI on :8000 and Vite on :5173 concurrently
 ```
+
+Or run each separately:
+
+```bash
+make api        # uvicorn api.main:app --reload --port 8000
+make dashboard  # cd dashboard && npm run dev
+```
+
+- API docs: http://localhost:8000/docs
+- Dashboard: http://localhost:5173
 
 **Tests**
 
