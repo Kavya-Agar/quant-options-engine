@@ -1,4 +1,4 @@
-# Options Pricing Engine
+# Quant Options Engine
 
 A from-scratch quantitative options pricing engine built in Python, implementing the core models used in derivatives trading. Built as a learning project to deeply understand options theory — every formula is derived and explained, not just called from a library.
 
