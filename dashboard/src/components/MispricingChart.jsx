@@ -1,6 +1,6 @@
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
-  Tooltip, ReferenceLine, ResponsiveContainer, Legend,
+  Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
 
 function CustomTooltip({ active, payload }) {
@@ -66,14 +66,14 @@ export default function MispricingChart({ contracts }) {
             stroke="var(--dim)" strokeDasharray="4 4"
           />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border)' }} />
-          <Legend
-            wrapperStyle={{ fontSize: 11, color: 'var(--dim)', paddingTop: 8 }}
-            formatter={v => v.toUpperCase()}
-          />
           <Scatter name="call" data={calls} fill="var(--green)" opacity={0.8} r={4} />
           <Scatter name="put"  data={puts}  fill="var(--red)"   opacity={0.8} r={4} />
         </ScatterChart>
       </ResponsiveContainer>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 8, fontSize: 11, color: 'var(--dim)' }}>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', marginRight: 6 }} />CALL</span>
+        <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--red)',   marginRight: 6 }} />PUT</span>
+      </div>
     </div>
   )
 }
