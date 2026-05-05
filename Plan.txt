@@ -3,7 +3,7 @@ OPTIONS PRICING ENGINE + GREEKS DASHBOARD — PROJECT PLAN
 STACK
 - Backend: Python, FastAPI
 - Math: NumPy, SciPy
-- Data: yfinance, FRED API (free)
+- Data: yfinance, FRED API
 - Frontend: React, Recharts or Plotly.js
 - Extras: Docker (optional, looks good on resume)
 
