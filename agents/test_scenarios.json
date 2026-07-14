@@ -1,0 +1,244 @@
+[
+  {
+    "id": 1,
+    "goal": "Hedge 100 shares of SPY against a 10% drop in the next 30 days",
+    "expected_strategy": "Protective Put",
+    "expected_legs": ["stock", "put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_put",
+      "proposal_has_stock",
+      "max_loss_under_5000",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 2,
+    "goal": "Generate income from my SPY holding without giving up upside",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_short_call",
+      "proposal_has_stock",
+      "net_cost_is_negative",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 3,
+    "goal": "Reduce my cost basis on 100 SPY shares I want to own",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 4,
+    "goal": "Hedge against a sharp drop but at lower cost than buying a put outright",
+    "expected_strategy": "Vertical Spread",
+    "expected_legs": ["long_put", "short_put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_two_puts",
+      "short_put_higher_strike",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 5,
+    "goal": "Profit if SPY stays flat or goes up slightly, but cap my risk",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 6,
+    "goal": "Lock in profits on my SPY position while keeping some upside",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 7,
+    "goal": "Protect my 100-share SPY position with maximum downside protection, cost is not a concern",
+    "expected_strategy": "Protective Put",
+    "expected_legs": ["stock", "put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_put",
+      "has_real_max_loss",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 8,
+    "goal": "I think SPY will stay range-bound. Sell a spread to profit from that",
+    "expected_strategy": "Vertical Spread",
+    "expected_legs": ["long_option", "short_option"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "has_short_leg",
+      "has_long_leg",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 9,
+    "goal": "Hedge 50 shares of SPY against a 5% drop",
+    "expected_strategy": "Protective Put",
+    "expected_legs": ["stock", "put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_put",
+      "proposal_has_stock",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 10,
+    "goal": "Generate quarterly income from my SPY shares, willing to sell at a 5% premium",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 11,
+    "goal": "Get short-term protection for SPY without paying full put premium",
+    "expected_strategy": "Vertical Spread",
+    "expected_legs": ["long_put", "short_put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_two_puts",
+      "lower_cost_than_simple_put",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 12,
+    "goal": "I have 100 SPY at 480. Hedge down to 450 and keep upside to 510",
+    "expected_strategy": "Protective Put",
+    "expected_legs": ["stock", "put"],
+    "constraints": {
+      "max_loss_usd": 3000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_put",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 13,
+    "goal": "Sell calls against my SPY holding to pay for a hedge",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 14,
+    "goal": "Reduce cost basis on a new SPY position I want to build",
+    "expected_strategy": "Covered Call",
+    "expected_legs": ["stock", "call"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_stock",
+      "proposal_has_short_call",
+      "passes_verifier"
+    ]
+  },
+  {
+    "id": 15,
+    "goal": "Protect my SPY shares for exactly 2 weeks with minimal cost",
+    "expected_strategy": "Vertical Spread",
+    "expected_legs": ["long_put", "short_put"],
+    "constraints": {
+      "max_loss_usd": 5000,
+      "min_dte": 7,
+      "min_oi": 100
+    },
+    "pass_criteria": [
+      "proposal_has_two_puts",
+      "passes_verifier"
+    ]
+  }
+]
