@@ -254,3 +254,135 @@ Brent's method combines bisection (guaranteed convergence) with secant/quadratic
 
 **What is the volatility smile/skew?**
 If BS were perfectly correct, IV would be constant across strikes. In practice, lower strikes have higher IV (skew) because investors buy downside protection. This reveals BS's assumptions are violated in real markets.
+
+## Phase 6 — MCP Server + AI Strategy Planner
+
+Building on the quantitative engine, this phase adds a conversational AI layer:
+
+### MCP Server
+
+An [Model Context Protocol](https://modelcontextprotocol.io/) server exposes the pricing functions as Claude tools:
+
+- **`get_greeks`** — Black-Scholes Greeks for a single option
+- **`get_implied_vol`** — Solve for IV from market price
+- **`get_chain_snapshot`** — Full options chain (cached 10 min to avoid yfinance rate limits)
+- **`price_strategy`** — Sum Greeks/P&L across multi-leg positions
+- **`validate_trade`** — Check strategy against risk constraints (max loss, min DTE, OI, no naked shorts)
+
+**Start the MCP server:**
+
+```bash
+python api/mcp_server.py
+```
+
+Then connect it to Claude Desktop for live testing.
+
+### Strategy Planner Agent
+
+Claude Opus orchestrates the tools to convert natural language goals into concrete multi-leg strategies:
+
+**Supported strategies:**
+- Covered Call: Long stock + short call (income)
+- Protective Put: Long stock + long put (downside hedge)
+- Vertical Spread: Buy/sell call or put spreads (defined risk)
+
+**Example:**
+
+```python
+from agents import run_planner_agent
+
+goal = "Hedge my 100 shares of SPY against a 10% drop"
+result = run_planner_agent(goal)
+
+# Returns:
+# {
+#   "proposals": [
+#     {
+#       "strategy_name": "Protective Put",
+#       "legs": [...],
+#       "net_cost": 285.00,
+#       "max_loss": 1285.00,
+#       "net_greeks": {...},
+#       "rationale": "..."
+#     }
+#   ]
+# }
+```
+
+**How it works:**
+
+1. Claude parses your goal (e.g., hedge, income, reduce cost)
+2. Calls `get_chain_snapshot("SPY")` to see available strikes
+3. Proposes 1–3 strategies with specific strikes and expiries
+4. Calls `price_strategy()` to compute real Greeks (no hallucination)
+5. Returns ranked proposals with full P&L and risk breakdown
+
+**Key safeguards:**
+- All Greeks come from actual tool calls (verified against BS formula)
+- Only liquid strikes (OI > 100)
+- No naked shorts
+- All strikes exist in the live chain
+
+### Verifier + Eval Harness
+
+A deterministic verifier validates proposals against hard constraints:
+
+- Max loss: $5,000 USD
+- Min days to expiration: 7 days
+- No naked short legs
+- Min open interest: 100 contracts
+
+An eval harness runs the planner + verifier on 15 hand-written test scenarios and measures:
+
+- **Pass rate:** % of proposals that pass all criteria
+- **Verifier catch rate:** % of proposals with violations caught and rejected
+
+**Run evaluation:**
+
+```bash
+python agents/eval_harness.py
+```
+
+Outputs: `agents/eval_results.json` with per-scenario results and summary metrics.
+
+**Why this matters for interviews:**
+
+This is how you demonstrate defensible AI: not just a fancy demo, but measurable validation. "The verifier caught and revised 2 out of 15 test-case proposals that violated my max-loss constraint" is a real, specific claim you can defend.
+
+### Project Structure (with AI components)
+
+```
+quant-options-engine/
+├── pricing/
+│   ├── black_scholes.py
+│   ├── monte_carlo.py
+│   ├── market_data.py
+│   ├── iv_solver.py
+│   └── models.py              # Pydantic models for proposals (NEW)
+├── api/
+│   ├── main.py
+│   ├── mcp_server.py          # MCP server with 5 tools (NEW)
+│   └── routes/
+│       ├── price.py
+│       └── chain.py
+├── agents/                    # AI agents (NEW)
+│   ├── __init__.py
+│   ├── planner.py             # Claude-powered strategy planner
+│   ├── verifier.py            # Deterministic risk checker
+│   ├── eval_harness.py        # Evaluation runner
+│   └── test_scenarios.json    # 15 test cases
+├── dashboard/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── bs.js
+│   │   ├── api.js
+│   │   └── components/
+│   │       ├── GreeksPanel.jsx
+│   │       ├── ChainView.jsx
+│   │       └── MispricingChart.jsx
+│   └── vite.config.js
+└── tests/
+    ├── test_black_scholes.py
+    ├── test_monte_carlo.py
+    └── test_iv_solver.py
+```
