@@ -23,21 +23,30 @@ quant-options-engine/
 │   ├── black_scholes.py       # Closed-form BS price + Greeks (Phase 1)
 │   ├── monte_carlo.py         # GBM simulation pricer (Phase 2)
 │   ├── market_data.py         # Spot price, risk-free rate, options chain (Phase 3)
-│   └── iv_solver.py           # Implied volatility solver — Brent's method (Phase 3)
+│   ├── iv_solver.py           # Implied volatility solver — Brent's method (Phase 3)
+│   └── models.py              # Pydantic schemas: Leg, StrategyProposal, RiskConstraints (Phase 6)
 ├── api/                       # FastAPI backend (Phase 4)
 │   ├── main.py                # App entry point + CORS
+│   ├── mcp_server.py          # MCP server: 5 tools + exact payoff-at-expiry analysis (Phase 6)
 │   └── routes/
 │       ├── price.py           # POST /api/price · GET /api/compute
-│       └── chain.py           # GET /api/chain · GET /api/expiries
-├── dashboard/                 # React frontend (Phase 5)
+│       ├── chain.py           # GET /api/chain · GET /api/expiries
+│       └── planner.py         # POST /api/plan — natural language → strategy proposals (Phase 6)
+├── agents/                    # AI strategy planner (Phase 6)
+│   ├── planner.py             # Claude tool-use loop → strategy proposals
+│   ├── verifier.py            # Deterministic (non-LLM) risk-constraint checker
+│   ├── eval_harness.py        # Runs planner+verifier over test_scenarios.json
+│   └── test_scenarios.json    # 15 hand-written test scenarios
+├── dashboard/                 # React frontend (Phase 5) + Strategy Planner tab (Phase 6)
 │   ├── src/
-│   │   ├── App.jsx            # Tab layout
-│   │   ├── bs.js              # Client-side BS for real-time sliders
-│   │   ├── api.js             # Fetch wrappers
+│   │   ├── App.jsx            # Tab layout — Greeks Explorer, Live Chain, Strategy Planner
+│   │   ├── bs.js               # Client-side BS for real-time sliders
+│   │   ├── api.js              # Fetch wrappers
 │   │   └── components/
-│   │       ├── GreeksPanel.jsx    # Interactive Greeks sliders
-│   │       ├── ChainView.jsx      # Live chain table + controls
-│   │       └── MispricingChart.jsx # Recharts scatter plot
+│   │       ├── GreeksPanel.jsx      # Interactive Greeks sliders
+│   │       ├── ChainView.jsx        # Live chain table + controls
+│   │       ├── MispricingChart.jsx  # Recharts scatter plot
+│   │       └── PlannerForm.jsx      # Strategy Planner tab (+ PlannerForm.css)
 │   └── vite.config.js         # Dev server proxies /api → FastAPI
 └── tests/                     # Test suite
     ├── test_black_scholes.py  # BS tests with reference values + identities
@@ -383,43 +392,4 @@ Outputs: `agents/eval_results.json` with per-scenario results and summary metric
 
 This is how you demonstrate defensible AI: not just a fancy demo, but measurable validation. "The verifier caught and flagged N out of 15 test-case proposals that violated my max-loss constraint" is a real, specific claim you can defend — and reproduce by running the harness.
 
-### Project Structure (with AI components)
-
-```
-quant-options-engine/
-├── pricing/
-│   ├── black_scholes.py
-│   ├── monte_carlo.py
-│   ├── market_data.py
-│   ├── iv_solver.py
-│   └── models.py               # Pydantic models: Leg, StrategyProposal, RiskConstraints, VerificationResult
-├── api/
-│   ├── main.py
-│   ├── mcp_server.py           # MCP server: 5 tools + exact payoff analysis
-│   └── routes/
-│       ├── price.py
-│       ├── chain.py
-│       └── planner.py          # POST /api/plan
-├── agents/
-│   ├── __init__.py
-│   ├── planner.py              # Claude tool-use loop → strategy proposals
-│   ├── verifier.py             # Deterministic risk-constraint checker
-│   ├── eval_harness.py         # Runs planner+verifier over test_scenarios.json
-│   └── test_scenarios.json     # 15 hand-written scenarios
-├── dashboard/
-│   ├── src/
-│   │   ├── App.jsx             # 3 tabs: Greeks Explorer, Live Chain, Strategy Planner
-│   │   ├── bs.js
-│   │   ├── api.js
-│   │   └── components/
-│   │       ├── GreeksPanel.jsx
-│   │       ├── ChainView.jsx
-│   │       ├── MispricingChart.jsx
-│   │       ├── PlannerForm.jsx # Strategy Planner tab
-│   │       └── PlannerForm.css
-│   └── vite.config.js
-└── tests/
-    ├── test_black_scholes.py
-    ├── test_monte_carlo.py
-    └── test_iv_solver.py
-```
+See [Project Structure](#project-structure) at the top for the full layout, including the Phase 6 files above.
