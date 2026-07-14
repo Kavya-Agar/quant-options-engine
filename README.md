@@ -2,6 +2,8 @@
 
 A from-scratch quantitative options pricing engine built in Python, implementing the core models used in derivatives trading. Built as a learning project to deeply understand options theory — every formula is derived and explained, not just called from a library.
 
+It has two layers: a quantitative core (Black-Scholes, Monte Carlo, implied volatility, all against live market data) and an AI layer on top (an MCP server, a Claude-powered strategy planner, and a deterministic verifier + eval harness) that turns the pricing engine into something you can ask for a strategy in plain English and get back a proposal with real, tool-computed Greeks and P&L.
+
 ## What's Implemented
 
 | Phase | Topic | Status |
@@ -11,6 +13,7 @@ A from-scratch quantitative options pricing engine built in Python, implementing
 | 3 | Market data (yfinance) + Implied Volatility solver (Brent's method) | ✅ |
 | 4 | FastAPI REST backend | ✅ |
 | 5 | React dashboard (Greeks heatmap, IV surface, mispricing chart) | ✅ |
+| 6 | MCP server + Claude strategy planner + deterministic verifier/eval harness | ✅ |
 
 ## Project Structure
 
@@ -78,6 +81,16 @@ pytest tests/ -v
 python -m pricing.black_scholes   # BS reference output
 python -m pricing.monte_carlo     # MC convergence table
 ```
+
+**AI planner (Phase 6) — needs one extra thing**
+
+The MCP server, dashboard, and REST API all run with no additional setup. The strategy planner (`agents/planner.py`, the `/api/plan` endpoint, the "Strategy Planner" dashboard tab, and `agents/eval_harness.py`) calls the real Anthropic API, so it additionally needs:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Everything else — pricing, Greeks, chain data, the two original dashboard tabs — works without this key.
 
 ## Phase 1 — Black-Scholes
 
@@ -257,17 +270,17 @@ If BS were perfectly correct, IV would be constant across strikes. In practice, 
 
 ## Phase 6 — MCP Server + AI Strategy Planner
 
-Building on the quantitative engine, this phase adds a conversational AI layer:
+Building on the quantitative engine, this phase adds a conversational AI layer.
 
 ### MCP Server
 
-An [Model Context Protocol](https://modelcontextprotocol.io/) server exposes the pricing functions as Claude tools:
+A [Model Context Protocol](https://modelcontextprotocol.io/) server (`api/mcp_server.py`, built on the real `mcp.server.Server` + `stdio_server` API) exposes the pricing functions as Claude tools:
 
 - **`get_greeks`** — Black-Scholes Greeks for a single option
 - **`get_implied_vol`** — Solve for IV from market price
-- **`get_chain_snapshot`** — Full options chain (cached 10 min to avoid yfinance rate limits)
-- **`price_strategy`** — Sum Greeks/P&L across multi-leg positions
-- **`validate_trade`** — Check strategy against risk constraints (max loss, min DTE, OI, no naked shorts)
+- **`get_chain_snapshot`** — Full options chain (cached 10 min per ticker+expiry, to avoid yfinance rate limits)
+- **`price_strategy`** — Net cost and exact max gain/loss/breakeven for a multi-leg strategy, computed via piecewise-linear payoff-at-expiry analysis (not a heuristic), plus net Greeks. Handles stock legs directly (delta = 1/share) alongside option legs.
+- **`validate_trade`** — Check a strategy against risk constraints (max loss, min DTE, min OI, no naked shorts)
 
 **Start the MCP server:**
 
@@ -275,16 +288,16 @@ An [Model Context Protocol](https://modelcontextprotocol.io/) server exposes the
 python api/mcp_server.py
 ```
 
-Then connect it to Claude Desktop for live testing.
+It speaks MCP over stdio — connect it to Claude Desktop (or the MCP Inspector) for live testing.
 
 ### Strategy Planner Agent
 
-Claude Opus orchestrates the tools to convert natural language goals into concrete multi-leg strategies:
+Claude (`agents/planner.py`, using the raw Anthropic SDK's tool-use loop — no LangChain) orchestrates the MCP tools to convert natural language goals into concrete multi-leg strategies.
 
 **Supported strategies:**
-- Covered Call: Long stock + short call (income)
-- Protective Put: Long stock + long put (downside hedge)
-- Vertical Spread: Buy/sell call or put spreads (defined risk)
+- Covered Call: Long stock + short call (income, capped upside)
+- Protective Put: Long stock + long put (downside hedge, unbounded upside)
+- Vertical Spread: Buy + sell same-type options at different strikes (defined risk both ways)
 
 **Example:**
 
@@ -296,58 +309,79 @@ result = run_planner_agent(goal)
 
 # Returns:
 # {
+#   "success": True,
 #   "proposals": [
 #     {
 #       "strategy_name": "Protective Put",
-#       "legs": [...],
-#       "net_cost": 285.00,
-#       "max_loss": 1285.00,
-#       "net_greeks": {...},
+#       "legs": [
+#         {"side": "long", "strike": 500, "expiry": "2026-09-18", "option_type": "stock", "quantity": 100},
+#         {"side": "long", "strike": 485, "expiry": "2026-09-18", "option_type": "put", "quantity": 1}
+#       ],
+#       "net_cost": 50285.00,   # includes the 100-share stock purchase, not just the put premium
+#       "max_loss": 1785.00,
+#       "max_gain": null,       # null = unbounded upside (the long stock leg has no cap)
+#       "breakeven": [502.85],
+#       "net_greeks": {"delta": 84.2, "gamma": 0.6, "vega": 45.1, "theta": -12.3, "rho": 30.5},
 #       "rationale": "..."
 #     }
 #   ]
 # }
 ```
 
+Every numeric field (`net_cost`, `max_gain`, `max_loss`, `breakeven`, `net_greeks`) is copied verbatim from `price_strategy()`'s tool output — the planner's system prompt explicitly forbids it from computing or estimating these itself. `max_gain` is `null`/`None` whenever upside is genuinely unbounded (e.g. any strategy with a long stock leg and no capping short call) rather than a made-up number.
+
 **How it works:**
 
 1. Claude parses your goal (e.g., hedge, income, reduce cost)
 2. Calls `get_chain_snapshot("SPY")` to see available strikes
 3. Proposes 1–3 strategies with specific strikes and expiries
-4. Calls `price_strategy()` to compute real Greeks (no hallucination)
+4. Calls `price_strategy()` and copies its numbers through as-is (no hallucination)
 5. Returns ranked proposals with full P&L and risk breakdown
 
 **Key safeguards:**
-- All Greeks come from actual tool calls (verified against BS formula)
+- All Greeks and P&L come from actual tool calls, never invented
 - Only liquid strikes (OI > 100)
-- No naked shorts
+- No naked shorts (a short is "covered" if there's a same-expiry long option of the same type, or a long stock leg for a covered call)
 - All strikes exist in the live chain
+
+### REST API + Dashboard Tab
+
+`POST /api/plan` (`api/routes/planner.py`) wraps the planner + verifier for the frontend:
+
+```bash
+curl -X POST http://localhost:8000/api/plan \
+  -H "Content-Type: application/json" \
+  -d '{"goal": "Generate income from my SPY holding"}'
+```
+
+The dashboard's third tab, **Strategy Planner** (`dashboard/src/components/PlannerForm.jsx`), is a form that posts to this endpoint and renders each proposal: rationale, net cost/max gain/max loss (showing "Unbounded" when `max_gain` is null), net Greeks, the leg table, and a ✓ Verified / ⚠ Needs Review badge with any constraint violations listed.
 
 ### Verifier + Eval Harness
 
-A deterministic verifier validates proposals against hard constraints:
+A deterministic verifier (`agents/verifier.py` — plain Python, no LLM) validates proposals against hard constraints:
 
 - Max loss: $5,000 USD
 - Min days to expiration: 7 days
 - No naked short legs
 - Min open interest: 100 contracts
 
-An eval harness runs the planner + verifier on 15 hand-written test scenarios and measures:
+An eval harness (`agents/eval_harness.py`) runs the planner + verifier on 15 hand-written test scenarios (`agents/test_scenarios.json`) and measures:
 
-- **Pass rate:** % of proposals that pass all criteria
-- **Verifier catch rate:** % of proposals with violations caught and rejected
+- **Pass rate:** % of proposals that pass all scenario-specific criteria
+- **Verifier catch rate:** % of proposals with violations caught and flagged
 
 **Run evaluation:**
 
 ```bash
+export ANTHROPIC_API_KEY=sk-ant-...
 python agents/eval_harness.py
 ```
 
-Outputs: `agents/eval_results.json` with per-scenario results and summary metrics.
+Outputs: `agents/eval_results.json` with per-scenario results and summary metrics. This needs a live API key and market data, so the actual pass rate/catch rate are only known once you run it — treat any specific numbers elsewhere in the docs as illustrative targets, not a substitute for running it.
 
 **Why this matters for interviews:**
 
-This is how you demonstrate defensible AI: not just a fancy demo, but measurable validation. "The verifier caught and revised 2 out of 15 test-case proposals that violated my max-loss constraint" is a real, specific claim you can defend.
+This is how you demonstrate defensible AI: not just a fancy demo, but measurable validation. "The verifier caught and flagged N out of 15 test-case proposals that violated my max-loss constraint" is a real, specific claim you can defend — and reproduce by running the harness.
 
 ### Project Structure (with AI components)
 
@@ -358,28 +392,31 @@ quant-options-engine/
 │   ├── monte_carlo.py
 │   ├── market_data.py
 │   ├── iv_solver.py
-│   └── models.py              # Pydantic models for proposals (NEW)
+│   └── models.py               # Pydantic models: Leg, StrategyProposal, RiskConstraints, VerificationResult
 ├── api/
 │   ├── main.py
-│   ├── mcp_server.py          # MCP server with 5 tools (NEW)
+│   ├── mcp_server.py           # MCP server: 5 tools + exact payoff analysis
 │   └── routes/
 │       ├── price.py
-│       └── chain.py
-├── agents/                    # AI agents (NEW)
+│       ├── chain.py
+│       └── planner.py          # POST /api/plan
+├── agents/
 │   ├── __init__.py
-│   ├── planner.py             # Claude-powered strategy planner
-│   ├── verifier.py            # Deterministic risk checker
-│   ├── eval_harness.py        # Evaluation runner
-│   └── test_scenarios.json    # 15 test cases
+│   ├── planner.py              # Claude tool-use loop → strategy proposals
+│   ├── verifier.py             # Deterministic risk-constraint checker
+│   ├── eval_harness.py         # Runs planner+verifier over test_scenarios.json
+│   └── test_scenarios.json     # 15 hand-written scenarios
 ├── dashboard/
 │   ├── src/
-│   │   ├── App.jsx
+│   │   ├── App.jsx             # 3 tabs: Greeks Explorer, Live Chain, Strategy Planner
 │   │   ├── bs.js
 │   │   ├── api.js
 │   │   └── components/
 │   │       ├── GreeksPanel.jsx
 │   │       ├── ChainView.jsx
-│   │       └── MispricingChart.jsx
+│   │       ├── MispricingChart.jsx
+│   │       ├── PlannerForm.jsx # Strategy Planner tab
+│   │       └── PlannerForm.css
 │   └── vite.config.js
 └── tests/
     ├── test_black_scholes.py
