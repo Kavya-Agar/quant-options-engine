@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import GreeksPanel from './components/GreeksPanel.jsx'
 import ChainView from './components/ChainView.jsx'
+import { PlannerForm } from './components/PlannerForm.jsx'
 
 const TABS = [
   { id: 0, label: 'Greeks Explorer' },
   { id: 1, label: 'Live Chain' },
+  { id: 2, label: 'Strategy Planner' },
 ]
 
 export default function App() {
@@ -60,6 +62,7 @@ export default function App() {
 
       {tab === 0 && <GreeksPanel />}
       {tab === 1 && <ChainView />}
+      {tab === 2 && <PlannerForm />}
     </div>
   )
 }

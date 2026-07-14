@@ -10,13 +10,13 @@ Interactive docs: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import chain, price
+from api.routes import chain, price, planner
 
 app = FastAPI(
     title="Options Pricing Engine",
     description=(
         "Black-Scholes pricing, all five Greeks, and Brent's-method implied volatility "
-        "computed against live options chains from yfinance."
+        "computed against live options chains from yfinance. Includes AI-powered strategy planner."
     ),
     version="1.0.0",
 )
@@ -30,6 +30,7 @@ app.add_middleware(
 
 app.include_router(price.router, prefix="/api", tags=["pricing"])
 app.include_router(chain.router, prefix="/api", tags=["chain"])
+app.include_router(planner.router, prefix="/api", tags=["planner"])
 
 
 @app.get("/health", tags=["meta"])
