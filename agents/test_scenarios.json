@@ -18,7 +18,7 @@
   },
   {
     "id": 2,
-    "goal": "Generate income from my SPY holding without giving up upside",
+    "goal": "Generate income from my SPY holding by selling upside above a strike",
     "expected_strategy": "Covered Call",
     "expected_legs": ["stock", "call"],
     "constraints": {
@@ -29,7 +29,7 @@
     "pass_criteria": [
       "proposal_has_short_call",
       "proposal_has_stock",
-      "net_cost_is_negative",
+      "capped_gain",
       "passes_verifier"
     ]
   },
@@ -61,7 +61,7 @@
     },
     "pass_criteria": [
       "proposal_has_two_puts",
-      "short_put_higher_strike",
+      "long_put_higher_strike",
       "passes_verifier"
     ]
   },

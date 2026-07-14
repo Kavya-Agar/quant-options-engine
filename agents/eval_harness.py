@@ -51,7 +51,7 @@ def check_proposal_has_two_puts(proposal: Dict) -> bool:
 
 
 def check_short_put_higher_strike(proposal: Dict) -> bool:
-    """Check if short put has higher strike than long put."""
+    """Check if short put has higher strike than long put (bull/credit put spread)."""
     legs = proposal.get("legs", [])
     puts = [leg for leg in legs if leg.get("option_type") == "put"]
     if len(puts) != 2:
@@ -66,9 +66,43 @@ def check_short_put_higher_strike(proposal: Dict) -> bool:
     return short_puts[0].get("strike", 0) > long_puts[0].get("strike", 0)
 
 
+def check_long_put_higher_strike(proposal: Dict) -> bool:
+    """
+    Check if the long put has a higher strike than the short put — the shape of a
+    debit (bear) put spread used to hedge downside cheaply: buy protection at the
+    higher strike, sell a lower strike to offset cost.
+    """
+    legs = proposal.get("legs", [])
+    puts = [leg for leg in legs if leg.get("option_type") == "put"]
+    if len(puts) != 2:
+        return False
+
+    long_puts = [p for p in puts if p.get("side") == "long"]
+    short_puts = [p for p in puts if p.get("side") == "short"]
+
+    if len(long_puts) != 1 or len(short_puts) != 1:
+        return False
+
+    return long_puts[0].get("strike", 0) > short_puts[0].get("strike", 0)
+
+
 def check_net_cost_negative(proposal: Dict) -> bool:
-    """Check if net cost is negative (credit spread)."""
+    """Check if net cost is negative (credit strategy — options-only, no stock leg)."""
     return proposal.get("net_cost", 0) < 0
+
+
+def check_max_loss_under_5000(proposal: Dict) -> bool:
+    """Check if max loss is within the $5,000 risk limit."""
+    max_loss = proposal.get("max_loss")
+    return max_loss is not None and max_loss <= 5000
+
+
+def check_capped_gain(proposal: Dict) -> bool:
+    """
+    Check that upside is capped (max_gain is a finite number rather than None).
+    This is the defining feature of a covered call versus holding stock outright.
+    """
+    return proposal.get("max_gain") is not None
 
 
 def check_has_real_max_loss(proposal: Dict) -> bool:
@@ -115,7 +149,10 @@ def evaluate_scenario(scenario: Dict, proposal: Dict) -> Dict[str, Any]:
         "proposal_has_short_call": check_proposal_has_short_call,
         "proposal_has_two_puts": check_proposal_has_two_puts,
         "short_put_higher_strike": check_short_put_higher_strike,
+        "long_put_higher_strike": check_long_put_higher_strike,
         "net_cost_is_negative": check_net_cost_negative,
+        "max_loss_under_5000": check_max_loss_under_5000,
+        "capped_gain": check_capped_gain,
         "has_real_max_loss": check_has_real_max_loss,
         "has_short_leg": check_has_short_leg,
         "has_long_leg": check_has_long_leg,
@@ -138,7 +175,10 @@ def evaluate_scenario(scenario: Dict, proposal: Dict) -> Dict[str, Any]:
                 logger.error(f"Error running check {check_name}: {e}")
                 failed.append(f"{check_name} (error)")
         else:
+            # An unrecognized check name is a defect in the scenario file, not a
+            # pass — count it as a failure so typos can't silently inflate the score.
             logger.warning(f"Unknown check: {check_name}")
+            failed.append(f"{check_name} (unknown)")
 
     return {
         "all_checks_passed": len(failed) == 0,
