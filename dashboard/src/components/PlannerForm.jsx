@@ -95,7 +95,10 @@ function StrategyCard({ proposal, index }) {
 
       <div className="strategy-metrics">
         <MetricBox label="Net Cost" value={`$${proposal.net_cost.toFixed(2)}`} />
-        <MetricBox label="Max Gain" value={`$${proposal.max_gain.toFixed(2)}`} />
+        <MetricBox
+          label="Max Gain"
+          value={proposal.max_gain == null ? "Unbounded" : `$${proposal.max_gain.toFixed(2)}`}
+        />
         <MetricBox label="Max Loss" value={`$${proposal.max_loss.toFixed(2)}`} />
       </div>
 
@@ -174,7 +177,7 @@ function PayoffChart({ proposal }) {
     <div className="payoff-chart">
       <p>📊 Payoff diagram would show profit/loss at different SPY prices</p>
       <p style={{ fontSize: "0.9em", color: "#999" }}>
-        Max Gain: ${proposal.max_gain.toFixed(2)} | Max Loss: ${proposal.max_loss.toFixed(2)}
+        Max Gain: {proposal.max_gain == null ? "Unbounded" : `$${proposal.max_gain.toFixed(2)}`} | Max Loss: ${proposal.max_loss.toFixed(2)}
       </p>
     </div>
   );

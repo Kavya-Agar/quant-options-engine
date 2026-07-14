@@ -28,30 +28,26 @@ def days_to_expiry(expiry: str) -> int:
 
 def is_leg_covered(leg: Leg, all_legs: list[Leg]) -> bool:
     """
-    Check if a short leg is covered.
+    Check if a short leg is covered (i.e. the position has bounded, defined risk).
 
-    A short is covered if:
-      1. There's a matching long at the same strike/expiry/option_type, OR
-      2. It's a covered call (short call + long stock)
+    A short call is covered if there's a long call at the same expiry (any
+    strike — this is what makes a vertical call spread risk-defined) or a
+    long stock position (a covered call).
+
+    A short put is covered if there's a long put at the same expiry (any
+    strike — a vertical put spread).
     """
 
     if leg.side == "long":
         return True  # Long legs are always fine
 
-    # Check for matching long leg
     for other_leg in all_legs:
-        if (other_leg.side == "long" and
-            other_leg.strike == leg.strike and
-            other_leg.expiry == leg.expiry and
-            other_leg.option_type == leg.option_type):
+        if other_leg is leg or other_leg.side != "long" or other_leg.expiry != leg.expiry:
+            continue
+        if leg.option_type == "call" and other_leg.option_type in ("call", "stock"):
             return True
-
-    # Check for covered call (short call + long stock)
-    if leg.option_type == "call":
-        for other_leg in all_legs:
-            if (other_leg.side == "long" and
-                other_leg.option_type == "stock"):
-                return True
+        if leg.option_type == "put" and other_leg.option_type == "put":
+            return True
 
     return False
 

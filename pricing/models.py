@@ -21,8 +21,8 @@ class StrategyProposal(BaseModel):
     """Complete strategy proposal with Greeks and P&L."""
     strategy_name: str  # "Protective Put", "Covered Call", "Vertical Spread", etc.
     legs: List[Leg]
-    net_cost: float  # debit (positive) or credit (negative), in USD per share * 100
-    max_gain: float  # maximum profit potential
+    net_cost: float  # debit (positive) or credit (negative), in USD
+    max_gain: Optional[float] = None  # maximum profit potential; None means unbounded (e.g. a protective put's long stock leg)
     max_loss: float  # maximum loss potential
     breakeven: List[float]  # prices where profit = 0
     net_greeks: Dict[str, float]  # {delta, gamma, vega, theta, rho}

@@ -4,10 +4,11 @@ FastAPI endpoints for the options strategy planner.
 POST /api/plan — Submit a natural language goal, get strategy proposals
 """
 
+import json
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-import asyncio
 
 from agents.planner import run_planner_agent
 from agents.verifier import verify_proposal
@@ -27,7 +28,7 @@ class ProposalResponse(BaseModel):
     strategy_name: str
     legs: list
     net_cost: float
-    max_gain: float
+    max_gain: Optional[float] = None  # None means unbounded upside
     max_loss: float
     breakeven: list
     net_greeks: dict
@@ -77,7 +78,6 @@ async def plan_strategy(request: PlanRequest):
 
         for proposal_data in proposals_raw:
             if isinstance(proposal_data, str):
-                import json
                 proposal_data = json.loads(proposal_data)
 
             try:

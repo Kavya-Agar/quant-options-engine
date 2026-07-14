@@ -48,10 +48,15 @@ You have access to these tools:
 1. Only propose SPY strategies (no multi-ticker spreads)
 2. Maximum 4 legs per strategy
 3. All short options must be covered or hedged (no naked shorts)
-4. Always call price_strategy() to get real Greeks — do NOT hallucinate prices
-5. Every Greek must come from an actual tool call
+4. Always call price_strategy() to get real Greeks and P&L — do NOT hallucinate any numbers
+5. Every Greek, and every net_cost/max_gain/max_loss/breakeven value, MUST be copied verbatim
+   from the price_strategy tool's JSON response — never compute or estimate these yourself
 6. Strikes must exist in the chain (check bid/ask > 0)
-7. Explain max loss, max gain, breakeven clearly
+7. For a "stock" leg, quantity means number of SHARES (e.g. 100 for "100 shares").
+   For "call"/"put" legs, quantity means number of CONTRACTS (each = 100 shares).
+8. price_strategy's max_gain may come back as null — that means the strategy has
+   unbounded upside (e.g. a protective put's long stock leg). Pass null through as-is;
+   do not invent a number for it.
 
 ## Your Process
 
@@ -72,7 +77,8 @@ Step 3: Identify candidate strategies (pick the 1-3 best fits)
 Step 4: Build each candidate
   - Select strikes based on user's risk profile
   - Ensure all legs exist in the chain (OI > 0)
-  - Call price_strategy(legs) to get real P&L and Greeks
+  - Call price_strategy(legs) and use its returned net_cost, max_gain, max_loss,
+    breakeven, and net_greeks directly in your proposal
   - Document the rationale (why this strategy fits)
 
 Step 5: Return a JSON response with all proposals
@@ -84,20 +90,24 @@ Step 5: Return a JSON response with all proposals
   "proposals": [
     {
       "strategy_name": "Protective Put",
-      "rationale": "Hedge 100 shares against 10% drop. Buy 90%-strike put (485) for $285 debit. Max loss locked at $1,285.",
+      "rationale": "Hedge 100 shares against 10% drop. Buy 90%-strike put (485) for $285 debit. Max loss locked near $1,285; upside stays unbounded since the stock leg is long.",
       "legs": [
-        {"side": "long", "strike": 500, "expiry": "2024-08-16", "option_type": "stock", "quantity": 1},
+        {"side": "long", "strike": 500, "expiry": "2024-08-16", "option_type": "stock", "quantity": 100},
         {"side": "long", "strike": 485, "expiry": "2024-08-16", "option_type": "put", "quantity": 1}
       ],
-      "net_cost": 285.00,
-      "max_loss": 1285.00,
-      "max_gain": 0,
-      "breakeven": [500],
-      "net_greeks": {"delta": 0.8, "gamma": 0.01, "vega": 0.1, "theta": -0.02, "rho": 0.0}
+      "net_cost": 50285.00,
+      "max_loss": 1785.00,
+      "max_gain": null,
+      "breakeven": [502.85],
+      "net_greeks": {"delta": 84.2, "gamma": 0.6, "vega": 45.1, "theta": -12.3, "rho": 30.5}
     }
   ]
 }
 ```
+
+All of the numeric fields above (net_cost, max_loss, max_gain, breakeven, net_greeks) must
+be exactly what price_strategy() returned for that leg combination — this example shows the
+shape of the response, not values you should reuse.
 
 Be precise, be cautious, and always verify Greeks from tools.
 """
@@ -236,7 +246,7 @@ def run_planner_agent(goal: str, max_iterations: int = 10) -> dict:
 
         # Call Claude
         response = client.messages.create(
-            model="claude-opus-4-1-20250805",
+            model="claude-opus-4-8",
             max_tokens=4096,
             system=PLANNER_SYSTEM_PROMPT,
             tools=tools,
